@@ -187,29 +187,36 @@ bool:LoadCtfMapCfgFile() {
 	return true;
 }
 
-ParseEntFromFile(const input[], ent_name[], len, Float:ent_origin[3], Float:ent_angles[3]) {
-	// We read in the next order: 1. Entity name (1 arg) 2. Entity origin (3 args) 3. Entity angles (3 args)
+bool:ParseEntFromFile(const input[], ent_name[], len, Float:ent_origin[3], Float:ent_angles[3]) {
 	// Input example: "item_flag_team1 973.734131 535.433899 36.031250 -4.268188 86.742554 0.000000"
-	new arg[32], pos, argc;
-	while (argc <= 6) {
+	new arg[32], pos;
+
+	// 1. Read entity name
+	pos = argparse(input, pos, arg, charsmax(arg));
+	if (pos == -1) {
+		return false;
+	}
+	copy(ent_name, len, arg);
+
+	// 2. Read entity origin
+	for (new i = 0; i < 3; i++) {
 		pos = argparse(input, pos, arg, charsmax(arg));
-		if (pos == -1)
-			break;
-		if (argc == 0) { // READING ENT NAME
-			copy(ent_name, len, arg);
-		} else if (argc >= 1 && argc <= 3) { // READING ENT ORIGIN
-			ent_origin[argc - 1] = str_to_float(arg);
-		} else if (argc >= 4 && argc <= 6) { // READING ENT ANGLES
-			ent_angles[argc - 4] = str_to_float(arg);
+		if (pos == -1) {
+			return false;
 		}
-		++argc;
+		ent_origin[i] = str_to_float(arg);
 	}
 
-	// we didn't get to read all the arguments, bad parsing
-	if (argc < 7)
-		return false;
-	else
-		return true;
+	// 3. Read entity angles
+	for (new i = 0; i < 3; i++) {
+		pos = argparse(input, pos, arg, charsmax(arg));
+		if (pos == -1) {
+			return false;
+		}
+		ent_angles[i] = str_to_float(arg);
+	}
+
+	return true;
 }
 
 public plugin_init() {

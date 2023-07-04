@@ -32,6 +32,12 @@ enum (+= 100) {
 #define FLAG_STATUS_NOTCARRIED 0
 #define FLAG_STATUS_CARRIED 1
 
+enum FlagStatus {
+	SPAWNPOINT = 0,
+	CARRIED,
+	DROPPED
+}
+
 new const INFO_PLAYER_DEATHMATCH[] = "info_player_deathmatch";
 new const INFO_PLAYER_BLUE[] = "info_player_team1";
 new const INFO_PLAYER_RED[] = "info_player_team2";
@@ -632,6 +638,26 @@ IsPlayerCarryingFlag(id) {
 		return RED_TEAM;
 	else
 		return 0;
+}
+
+stock bool:Flag_IsCarried(ent) {
+	return pev(ent, pev_aiment) != 0;
+}
+
+stock bool:Flag_IsDropped(ent) {
+	return Flag_GetStatus() == FlagStatus:DROPPED;
+}
+
+stock FlagStatus:Flag_GetStatus(ent) {
+	return FlagStatus:pev(ent, pev_iuser1);
+}
+
+stock Flag_SetStatus(ent, FlagStatus:status) {
+	set_pev(ent, pev_iuser1, status);
+}
+
+stock bool:Flag_IsOnSpawnPoint(ent) {
+	return Flag_GetStatus(ent) == FlagStatus:SPAWNPOINT;
 }
 
 stock DrawFlagIcon(id, bool:status, team) {

@@ -60,8 +60,14 @@ new gHudCtfMessage;
 new gTeamListModels[HL_MAX_TEAMS][HL_MAX_TEAMNAME_LENGTH];
 
 new gCvarCtfDebug;
-new gCvarCapturePoints;
-new gCvarFlagReturnTime;
+new gCvarCaptureLimit;		// the number of captures before map ends. 
+new gCvarCapturePoints;		// the amount of points his teammates get.
+new gCvarTeamCapturePoints;	// the amount of points his teammates get.
+new gCvarDefendPoints;		// the amount of points the defender gets.
+new gCvarStealPoints;		// the amount of points the stealer gets. 
+new gCvarCarrierKillPoints; // the amount of points the killer gets.
+new gCvarReturnPoints;		// the amount of points the returner gets.
+new gCvarFlagReturnTime;	// the time that a dropped flag lays in the world before respawning.
 new gCvarFlagDelayTime;
 
 public plugin_precache() {
@@ -80,8 +86,14 @@ public plugin_precache() {
 		precache_sound(VOX_SOUNDS[i]);
 
 	gCvarCtfDebug = create_cvar("sv_ag_ctf_debug", "0");
-	gCvarCapturePoints = create_cvar("sv_ag_ctf_capturepoints", "10");
-	gCvarFlagReturnTime = create_cvar("sv_ag_ctf_flag_returntime", "30");
+	gCvarCaptureLimit = create_cvar("sv_ag_ctf_capturelimit", "10");
+	gCvarCapturePoints = create_cvar("sv_ag_ctf_capturepoints", "4");
+	gCvarTeamCapturePoints = create_cvar("sv_ag_ctf_teamcapturepoints", "1");
+	gCvarDefendPoints = create_cvar("sv_ag_ctf_defendpoints", "1");
+	gCvarReturnPoints = create_cvar("sv_ag_ctf_returnpoints", "1");
+	gCvarStealPoints = create_cvar("sv_ag_ctf_stealpoints", "1");	
+	gCvarCarrierKillPoints = create_cvar("sv_ag_ctf_carrierkillpoints", "1");
+	gCvarFlagReturnTime = create_cvar("sv_ag_ctf_flag_resettime", "30");
 	gCvarFlagDelayTime = create_cvar("sv_ag_ctf_flag_delaytime", "3");
 }
 

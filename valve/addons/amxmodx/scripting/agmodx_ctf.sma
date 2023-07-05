@@ -479,7 +479,7 @@ public OnCapturePointTouch(touched, toucher) {
 
 				new points = get_pcvar_num(gCvarCapturePoints);
 				AddPoints(toucher, points);
-				AddPointsToTeammates(BLUE_TEAM, get_pcvar_num(gCvarTeamCapturePoints));
+				AddPointsToTeammates(RED_TEAM, get_pcvar_num(gCvarTeamCapturePoints));
 				gRedScore++;
 				UpdateTeamScore();
 
@@ -499,6 +499,7 @@ public OnCapturePointTouch(touched, toucher) {
 
 				new points = get_pcvar_num(gCvarCapturePoints);
 				AddPoints(toucher, points);
+				AddPointsToTeammates(BLUE_TEAM, get_pcvar_num(gCvarTeamCapturePoints));
 				gBlueScore++;
 				UpdateTeamScore();
 

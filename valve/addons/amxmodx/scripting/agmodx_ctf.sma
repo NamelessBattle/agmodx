@@ -324,22 +324,18 @@ public CmdSpectate(id) {
 }
 
 public AddPoints(id, points) {
-	static scoreInfo;
+	hl_set_user_frags(id, get_user_frags(id) + points);
+}
 
-	if (!scoreInfo)
-		scoreInfo = get_user_msgid("ScoreInfo");
+public AddPointsToTeammates(teamIndex, points) {
+	new players[MAX_PLAYERS], numPlayers;
+	get_players_ex(players, numPlayers, GetPlayers_ExcludeDead);
 
-	new frags = get_user_frags(id) + points;
-	set_user_frags(id, frags);
-	
-	// show new score
-	message_begin(MSG_BROADCAST, scoreInfo);
-	write_byte(id);
-	write_short(frags);
-	write_short(hl_get_user_deaths(id));
-	write_short(0);
-	write_short(hl_get_user_team(id));
-	message_end();
+	for (new i = 0; i < numPlayers; i++) {
+		if (hl_get_user_team(players[i]) == teamIndex) {
+			AddPoints(players[i], points);
+		}
+	}
 }
 
 CtfHudMessage(id, const playerMsg[] = "", const teamMsg[] = "", const nonTeamMsg[] = "") {
@@ -472,13 +468,19 @@ public FwCapturePointTouch(touched, toucher) {
 	switch (IsPlayerCarryingFlag(toucher)) {
 		case BLUE_TEAM: { // Captured Blue Team flag
 			if (touched == gBaseRed) {
+				// Capture isn't allowed when your flag team is being carried or dropped
+				if (!Flag_IsOnSpawnPoint(gFlagRed)) {
+					return;
+				}
+
 				DrawFlagIcon(toucher, false, BLUE_TEAM);
 				SetFlagCarriedByPlayer(toucher, 0);
 				ReturnFlagToBase(gFlagBlue);
 
 				new points = get_pcvar_num(gCvarCapturePoints);
 				AddPoints(toucher, points);
-				gRedScore += points;
+				AddPointsToTeammates(BLUE_TEAM, get_pcvar_num(gCvarTeamCapturePoints));
+				gRedScore++;
 				UpdateTeamScore();
 
 				CtfHudMessage(toucher, "CTF_YOUCAP", "CTF_TEAMCAP", "CTF_THEYCAP");
@@ -486,13 +488,18 @@ public FwCapturePointTouch(touched, toucher) {
 			}
 		} case RED_TEAM: { // Captured Red Team flag
 			if (touched == gBaseBlue) {
+				// Capture isn't allowed when your flag team is being carried or dropped
+				if (!Flag_IsOnSpawnPoint(gFlagBlue)) {
+					return;
+				}
+			
 				DrawFlagIcon(toucher, false, RED_TEAM);
 				SetFlagCarriedByPlayer(toucher, 0);
 				ReturnFlagToBase(gFlagRed);
 
 				new points = get_pcvar_num(gCvarCapturePoints);
 				AddPoints(toucher, points);
-				gBlueScore += points;
+				gBlueScore++;
 				UpdateTeamScore();
 
 				CtfHudMessage(toucher, "CTF_YOUCAP", "CTF_TEAMCAP", "CTF_THEYCAP");
@@ -503,19 +510,42 @@ public FwCapturePointTouch(touched, toucher) {
 }
 
 public FwPlayerKilled(victim, attacker) {
-	new ent = GetFlagCarriedByPlayer(victim);
-	if (!ent)
-		return HAM_IGNORED;
+	new entFlag = GetFlagCarriedByPlayer(victim);
+	new areTeamMates = hl_get_user_team(attacker) == hl_get_user_team(victim);
 
-	new classname[32];
-	if (pev_valid(attacker)) {
-		pev(attacker, pev_classname, classname, charsmax(classname));
+	// Bonus player for defending his flag		
+	if (IsPlayer(attacker) && victim != attacker && !areTeamMates) {
+		new Float:playerOrigin[3];
+		new Float:flagOrigin[3];
+		pev(attacker, pev_origin, playerOrigin);
+		if (hl_get_user_team(attacker) == BLUE_TEAM) {
+			pev(gFlagBlue, pev_origin, flagOrigin);
+		} else {
+			pev(gFlagRed, pev_origin, flagOrigin);
+		}
+
+		if (get_distance_f(playerOrigin, flagOrigin) < 192) {
+			AddPoints(attacker, get_pcvar_num(gCvarDefendPoints));
+		}
 	}
 
-	if (equal(classname, "trigger_hurt")) {
-		SetFlagCarriedByPlayer(victim, 0);
-		ReturnFlagToBase(ent);
-	} else {
+	if (IsPlayerCarryingFlag(victim)) {
+		// Give points to attacker for killing flag stealer
+		if (IsPlayer(attacker) && !areTeamMates) {
+			AddPoints(attacker, get_pcvar_num(gCvarCarrierKillPoints));
+		}
+
+		new classname[32];
+		pev(attacker, pev_classname, classname, charsmax(classname));
+
+		// Deaths caused by a trigger_hurt (Possible falling in some unaccesible area)
+		// will return the flag to base
+		if (equal(classname, "trigger_hurt")) {
+			SetFlagCarriedByPlayer(victim, 0);
+			ReturnFlagToBase(entFlag);
+			return HAM_IGNORED;
+		}
+
 		DropFlag(victim);
 	}
 
@@ -542,13 +572,24 @@ public FwFlagTouch(touched, toucher) {
 
 	new team = hl_get_user_team(toucher);
 
-	if (touched == gFlagBlue) {
-		if (team == RED_TEAM)
-			TakeFlag(toucher, touched);
-	} else if (touched == gFlagRed) {
-		if (team == BLUE_TEAM)
-			TakeFlag(toucher, touched);
+	if (GetFlagTeam(touched) == team) {
+		// Give points for returning your flag
+		if (!Flag_IsOnSpawnPoint(touched)) {
+			ReturnFlagToBase(touched);
+			AddPoints(toucher, get_pcvar_num(gCvarReturnPoints));
+			//todo: display message to all players
+		}
 	}
+
+	if (GetFlagTeam(touched) != team) {
+		// Give points for stealing the flag from spawn point
+		if (Flag_IsOnSpawnPoint(touched)) {
+			AddPoints(toucher, get_pcvar_num(gCvarStealPoints));
+		}
+		TakeFlag(toucher, touched);
+	}
+	
+
 	return PLUGIN_CONTINUE;
 }
 
@@ -611,6 +652,8 @@ ReturnFlagToBase(ent) {
 	set_pev(ent, pev_sequence, FLAG_SEQ_NOTCARRIED);
 	set_pev(ent, pev_solid, SOLID_TRIGGER);
 
+	Flag_SetStatus(ent, FlagStatus:SPAWNPOINT);
+
 	entity_set_size(ent, Float:{ 4.0, 4.0, 0.0 }, Float:{ 4.0, 4.0, 72.0 });
 
 	create_teleport_splash(ent);
@@ -618,12 +661,7 @@ ReturnFlagToBase(ent) {
 	SetFlagNextTouch(ent, get_pcvar_float(gCvarFlagDelayTime));
 
 	// notify players that flag has return to base
-	new team;
-	switch (GetFlagTeam(ent)) {
-		case BLUE_TEAM: team = RED_TEAM;
-		case RED_TEAM: team = BLUE_TEAM;
-	}
-	
+	new team = GetFlagTeam(ent);
 	CtfTeamHudMessage(team, "CTF_EFLAGBACK", "CTF_FLAGBACK");
 	CtfTeamSpeak(team, "!CTF_EFLAGBACK", "!CTF_FLAGBACK");
 }
@@ -688,6 +726,7 @@ public TakeFlag(id, ent) {
 	remove_task(ent + TASK_RETURNFLAGTOBASE);
 	AttachFlagToPlayer(id, ent);
 	SetFlagCarriedByPlayer(id, ent);
+	Flag_SetStatus(ent, FlagStatus:CARRIED);
 	DrawFlagIcon(id, true, GetFlagTeam(ent));
 	CtfHudMessage(id, "CTF_YOUGOTFLAG", "CTF_GOTFLAG", "CTF_EGOTFLAG");
 	CtfSpeak(id, "!CTF_YOUGOTFLAG", "!CTF_GOTFLAG", "!CTF_EGOTFLAG");
@@ -715,6 +754,8 @@ public DropFlag(id) {
 	set_pev(ent, pev_sequence, FLAG_SEQ_NOTCARRIED);
 	set_pev(ent, pev_angles, 0);
 
+	Flag_SetStatus(ent, FlagStatus:DROPPED);
+
 	if (is_user_alive(id)) { // drop it where player points
 		new Float:velocity[3];
 		velocity_by_aim(id, 400, velocity);
@@ -728,7 +769,8 @@ public DropFlag(id) {
 
 	entity_set_size(ent, Float:{0.0, 0.0, 0.0}, Float:{0.0, 0.0, 0.0}); // collisions will work as expected with no size (strange)
 
-	SetFlagNextTouch(ent, get_pcvar_float(gCvarFlagDelayTime));
+	// Give some time to the flag to fly, otherwise it'll be picked up by us again
+	SetFlagNextTouch(ent, 0.5);
 	set_pev(ent, pev_solid, SOLID_TRIGGER);
 
 	CtfTeamHudMessage(GetFlagTeam(ent), "CTF_ELOSTFLAG", "CTF_LOSTFLAG");
@@ -757,6 +799,8 @@ SpawnFlag(ent) {
 	set_pev(ent, pev_solid, SOLID_TRIGGER);
 	set_pev(ent, pev_sequence, FLAG_SEQ_NOTCARRIED);
 	set_pev(ent, pev_framerate, 1.0);
+
+	Flag_SetStatus(ent, FlagStatus:SPAWNPOINT);
 
 	// when flag is on ground, set a new start origin
 	drop_to_floor(ent);

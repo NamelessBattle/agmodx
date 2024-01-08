@@ -514,18 +514,20 @@ public OnPlayerKilled(victim, attacker) {
 	new entFlag = GetFlagCarriedByPlayer(victim);
 	new areTeamMates = hl_get_user_team(attacker) == hl_get_user_team(victim);
 
-	// Bonus player for defending his flag		
-	if (IsPlayer(attacker) && victim != attacker && !areTeamMates) {
-		new Float:playerOrigin[3];
+	// Bonus attacker for defending his flag from the enemy 
+	if (IsPlayer(attacker) && victim != attacker && !areTeamMates && !Player_IsCarryingFlag(victim)) {
 		new Float:flagOrigin[3];
-		pev(attacker, pev_origin, playerOrigin);
 		if (hl_get_user_team(attacker) == BLUE_TEAM) {
 			pev(gFlagBlue, pev_origin, flagOrigin);
 		} else {
 			pev(gFlagRed, pev_origin, flagOrigin);
 		}
+		
+		new Float:victimOrigin[3];
+		pev(victim, pev_origin, victimOrigin);
 
-		if (get_distance_f(playerOrigin, flagOrigin) < 192) {
+		// Give points only if enemy is close to the flag within a radius of 192 units
+		if (get_distance_f(victimOrigin, flagOrigin) < 192) {
 			AddPoints(attacker, get_pcvar_num(gCvarDefendPoints));
 		}
 	}

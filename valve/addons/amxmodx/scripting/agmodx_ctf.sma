@@ -459,6 +459,10 @@ stock Speak(id, const speak[]) {
 	client_cmd(id, "speak ^"%s^"", speak);
 }
 
+stock AreTeamMates(firstPlayer, secondPlayer) {
+	return hl_get_user_team(firstPlayer) == hl_get_user_team(secondPlayer);
+}
+
 public DropFlagSpec(id) {
 	if (hl_get_user_spectator(id))
 		DropFlag(id);
@@ -511,11 +515,30 @@ public OnCapturePointTouch(touched, toucher) {
 }
 
 public OnPlayerKilled(victim, attacker) {
-	new entFlag = GetFlagCarriedByPlayer(victim);
-	new areTeamMates = hl_get_user_team(attacker) == hl_get_user_team(victim);
+	if (Player_IsCarryingFlag(victim)) {
+		// Give points to attacker for killing flag stealer
+		if (IsPlayer(attacker) && !AreTeamMates(attacker, victim)) {
+			AddPoints(attacker, get_pcvar_num(gCvarCarrierKillPoints));
+		}
 
+		new classname[32];
+		pev(attacker, pev_classname, classname, charsmax(classname));
+
+		// Deaths caused by a trigger_hurt (Possible falling in some unaccesible area)
+		// will return the flag to base
+		if (equal(classname, "trigger_hurt")) {
+			SetFlagCarriedByPlayer(victim, 0);
+			Flag_Reset(GetFlagCarriedByPlayer(victim));
+			return HAM_IGNORED;
+		}
+
+		DropFlag(victim);
+
+		return HAM_IGNORED;
+	}
+	
 	// Bonus attacker for defending his flag from the enemy 
-	if (IsPlayer(attacker) && victim != attacker && !areTeamMates && !Player_IsCarryingFlag(victim)) {
+	if (IsPlayer(attacker) && victim != attacker && !AreTeamMates(attacker, victim)) {
 		new Float:flagOrigin[3];
 		if (hl_get_user_team(attacker) == BLUE_TEAM) {
 			pev(gFlagBlue, pev_origin, flagOrigin);
@@ -530,26 +553,6 @@ public OnPlayerKilled(victim, attacker) {
 		if (get_distance_f(victimOrigin, flagOrigin) < 192) {
 			AddPoints(attacker, get_pcvar_num(gCvarDefendPoints));
 		}
-	}
-
-	if (Player_IsCarryingFlag(victim)) {
-		// Give points to attacker for killing flag stealer
-		if (IsPlayer(attacker) && !areTeamMates) {
-			AddPoints(attacker, get_pcvar_num(gCvarCarrierKillPoints));
-		}
-
-		new classname[32];
-		pev(attacker, pev_classname, classname, charsmax(classname));
-
-		// Deaths caused by a trigger_hurt (Possible falling in some unaccesible area)
-		// will return the flag to base
-		if (equal(classname, "trigger_hurt")) {
-			SetFlagCarriedByPlayer(victim, 0);
-			Flag_Reset(entFlag);
-			return HAM_IGNORED;
-		}
-
-		DropFlag(victim);
 	}
 
 	return HAM_IGNORED;

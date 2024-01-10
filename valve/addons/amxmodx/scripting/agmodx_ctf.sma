@@ -327,15 +327,25 @@ public AddPoints(id, points) {
 	hl_set_user_frags(id, get_user_frags(id) + points);
 }
 
-public AddPointsToTeammates(teamIndex, points) {
+AddPointsToTeammates(teamIndex, points, skipPlayer = 0) {
 	new players[MAX_PLAYERS], numPlayers;
 	get_players_ex(players, numPlayers, GetPlayers_ExcludeDead);
 
 	for (new i = 0; i < numPlayers; i++) {
-		if (hl_get_user_team(players[i]) == teamIndex) {
+		if (players[i] != skipPlayer && hl_get_user_team(players[i]) == teamIndex) {
 			AddPoints(players[i], points);
 		}
 	}
+}
+
+
+AddPointsToTeamScore(teamIndex, points) {
+	if (teamIndex == BLUE_TEAM) {
+		gBlueScore += points;
+	} else if (teamIndex == RED_TEAM) {
+		gRedScore += points;
+	}
+	return 0;
 }
 
 CtfHudMessage(id, const playerMsg[] = "", const teamMsg[] = "", const nonTeamMsg[] = "") {
@@ -468,50 +478,48 @@ public DropFlagSpec(id) {
 		DropFlag(id);
 }
 
-public OnCapturePointTouch(touched, toucher) {
-	switch (Player_IsCarryingFlag(toucher)) {
-		case BLUE_TEAM: { // Captured Blue Team flag
-			if (touched == gBaseRed) {
-				// Capture isn't allowed when your flag team is being carried or dropped
-				if (!Flag_IsOnSpawnPoint(gFlagRed)) {
-					return;
-				}
-
-				Player_DrawFlagIcon(toucher, false, BLUE_TEAM);
-				SetFlagCarriedByPlayer(toucher, 0);
-				Flag_Reset(gFlagBlue);
-
-				new points = get_pcvar_num(gCvarCapturePoints);
-				AddPoints(toucher, points);
-				AddPointsToTeammates(RED_TEAM, get_pcvar_num(gCvarTeamCapturePoints));
-				gRedScore++;
-				UpdateTeamScore();
-
-				CtfHudMessage(toucher, "CTF_YOUCAP", "CTF_TEAMCAP", "CTF_THEYCAP");
-				CtfSpeak(toucher, "!CTF_YOUCAP", "!CTF_TEAMCAP", "!CTF_THEYCAP");
-			}
-		} case RED_TEAM: { // Captured Red Team flag
-			if (touched == gBaseBlue) {
-				// Capture isn't allowed when your flag team is being carried or dropped
-				if (!Flag_IsOnSpawnPoint(gFlagBlue)) {
-					return;
-				}
-			
-				Player_DrawFlagIcon(toucher, false, RED_TEAM);
-				SetFlagCarriedByPlayer(toucher, 0);
-				Flag_Reset(gFlagRed);
-
-				new points = get_pcvar_num(gCvarCapturePoints);
-				AddPoints(toucher, points);
-				AddPointsToTeammates(BLUE_TEAM, get_pcvar_num(gCvarTeamCapturePoints));
-				gBlueScore++;
-				UpdateTeamScore();
-
-				CtfHudMessage(toucher, "CTF_YOUCAP", "CTF_TEAMCAP", "CTF_THEYCAP");
-				CtfSpeak(toucher, "!CTF_YOUCAP", "!CTF_TEAMCAP", "!CTF_THEYCAP");
-			}
-		}
+GetCapturePointTeam(ent) {
+	if (ent == gBaseBlue) {
+		return BLUE_TEAM;
+	} else if (ent == gBaseRed) {
+		return RED_TEAM;
 	}
+	return 0;
+}
+
+public OnCapturePointTouch(touched, toucher) {
+	if (!Player_IsCarryingFlag(toucher)) {
+		return;
+	}
+
+	// Player is trying to capture the flag, let's do some checks
+	new toucherTeam = hl_get_user_team(toucher);
+	new capturePointTeam =  GetCapturePointTeam(touched);
+
+	// You can't capture the flag on someone else's base
+	if (toucherTeam != capturePointTeam) {
+		return;
+	}
+
+	// Capture isn't allowed when your team flag is being carried or dropped
+	if (!Flag_IsOnSpawnPoint(GetFlagEntity(toucherTeam))) {
+		return;
+	}
+
+	new flagStealedEnt = GetFlagCarriedByPlayer(toucher);
+	new flagStealedTeam = Flag_GetTeam(flagStealedEnt);
+
+	Player_DrawFlagIcon(toucher, false, flagStealedTeam);
+	SetFlagCarriedByPlayer(toucher, 0);
+	Flag_Reset(flagStealedEnt);
+
+	AddPoints(toucher, get_pcvar_num(gCvarCapturePoints));
+	AddPointsToTeammates(toucherTeam, get_pcvar_num(gCvarTeamCapturePoints), toucher);
+	AddPointsToTeamScore(toucherTeam, 1);
+	UpdateTeamScore();
+
+	CtfHudMessage(toucher, "CTF_YOUCAP", "CTF_TEAMCAP", "CTF_THEYCAP");
+	CtfSpeak(toucher, "!CTF_YOUCAP", "!CTF_TEAMCAP", "!CTF_THEYCAP");
 }
 
 public OnPlayerKilled(victim, attacker) {

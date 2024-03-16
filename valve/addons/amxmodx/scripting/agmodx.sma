@@ -433,7 +433,7 @@ public plugin_init() {
 	ag_register_concmd("agforceteamup", "CmdAgForceTeamUp", ADMIN_BAN, "AGCMD_FORCETEAMUP", _, true);
 	
 	ag_register_concmd("aglistvotes", "CmdVoteHelp", ADMIN_ALL, "AGCMD_LISTVOTES", _, true);
-	ag_register_concmd("timeleft", "CmdTimeLeft", ADMIN_ALL, "AGCMD_TIMELEFT", _, true);
+	ag_register_clcmd("say timeleft", "CmdTimeLeft", ADMIN_USER, "AGCMD_TIMELEFT", _, true);
 	ag_register_clcmd("vote", "CmdVote", ADMIN_ALL, "AGCMD_VOTE", _, true);
 	ag_register_clcmd("yes", "CmdVoteYes", ADMIN_ALL, "AGCMD_YES", _, true);
 	ag_register_clcmd("no", "CmdVoteNo", ADMIN_ALL, "AGCMD_NO", _, true);
@@ -704,7 +704,7 @@ public CmdTimeLeft(id) {
 		formatex(text, charsmax(text), "0");
 	else
 		FormatTimeLeft(gTimeLeft, text, charsmax(text));
-	client_print(id, print_console, "timeleft: %s", text);
+	client_print(id, print_chat, "[AGMODX] timeleft: %s", text);
 	return PLUGIN_HANDLED;
 }
 
